@@ -94,10 +94,10 @@ io.on('connection', async (socket) => {
         console.log(error);
     }
 
-    socket.on('sendMessage', async (msg) => {
+socket.on('sendMessage', async (msg) => {
+        socket.broadcast.emit('receiveMessage', msg);
         try {
             await Message.create({ token: socket.userToken, msg });
-            socket.broadcast.emit('receiveMessage', msg);
         } catch (error) {
             console.log(error);
         }

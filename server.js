@@ -24,7 +24,7 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://jumkhlil_db_user:jumaa
 
 mongoose.connect(MONGO_URI).then(() => {
     console.log("DB Connected");
-}).catch(err => console.log(err));
+}).catch(err => console.log("Connection Error:", err.message));
 
 const messageSchema = new mongoose.Schema({
     token: String,
@@ -97,12 +97,13 @@ io.on('connection', async (socket) => {
 socket.on('sendMessage', async (msg) => {
         socket.broadcast.emit('receiveMessage', msg);
         try {
+            console.log("Saving:", msg);
             await Message.create({ token: socket.userToken, msg });
+            console.log("Saved Success");
         } catch (error) {
-            console.log(error);
+            console.log("DB Error:", error.message);
         }
     });
-
     socket.on('typing', () => {
         socket.broadcast.emit('typing');
     });

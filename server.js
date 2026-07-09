@@ -6,31 +6,39 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const crypto = require('crypto');
 const cors = require('cors');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: { origin: "*" },
-    maxHttpBufferSize: 52428800 // لدعم الصور والمقاطع
+    maxHttpBufferSize: 52428800
 });
 
 app.use(cors());
 app.use(express.json());
-
-// ربط مجلد الواجهة
 app.use(express.static(path.join(__dirname, 'public')));
 
-// الذاكرة المؤقتة البديلة لقاعدة البيانات
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://jumkhlil_db_user:jumaahklx758274@cluster0.yzk2tsj.mongodb.net/secureChat?appName=Cluster0";
+
+mongoose.connect(MONGO_URI).then(() => {
+    console.log("DB Connected");
+}).catch(err => console.log(err));
+
+const messageSchema = new mongoose.Schema({
+    token: String,
+    msg: String,
+    createdAt: { type: Date, default: Date.now, expires: 172800 }
+});
+const Message = mongoose.model('Message', messageSchema);
+
 let tasks = [];
-let messages = [];
 const activeTokens = new Set();
 
 app.post('/api/input', async (req, res) => {
     try {
         const { input } = req.body;
-        
-        // التحقق من كلمة السر (12345)
         const secretHash = process.env.SECRET_HASH || await bcrypt.hash("12345", 10);
         const isPassword = await bcrypt.compare(input, secretHash);
 
@@ -46,7 +54,6 @@ app.post('/api/input', async (req, res) => {
             return res.json({ action: 'TASK_ADDED', id: taskId, task: input });
         }
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: "Server Error" });
     }
 });
@@ -67,20 +74,33 @@ io.use((socket, next) => {
         socket.userToken = token;
         next();
     } else {
-        next(new Error("Unauthorized access"));
+        next(new Error("Unauthorized"));
     }
 });
 
-io.on('connection', (socket) => {
-    const history = messages.slice(-10).map(m => ({
-        msg: m.msg,
-        type: m.token === socket.userToken ? 'sent' : 'received'
-    }));
-    socket.emit('chatHistory', history);
+io.on('connection', async (socket) => {
+    try {
+        const rows = await Message.find().sort({ createdAt: -1 }).limit(10);
+        const sortedRows = rows.reverse();
+        
+        if (sortedRows.length > 0) {
+            const history = sortedRows.map(r => ({
+                msg: r.msg,
+                type: r.token === socket.userToken ? 'sent' : 'received'
+            }));
+            socket.emit('chatHistory', history);
+        }
+    } catch (error) {
+        console.log(error);
+    }
 
-    socket.on('sendMessage', (msg) => {
-        messages.push({ token: socket.userToken, msg: msg });
-        socket.broadcast.emit('receiveMessage', msg);
+    socket.on('sendMessage', async (msg) => {
+        try {
+            await Message.create({ token: socket.userToken, msg });
+            socket.broadcast.emit('receiveMessage', msg);
+        } catch (error) {
+            console.log(error);
+        }
     });
 
     socket.on('typing', () => {
@@ -88,10 +108,9 @@ io.on('connection', (socket) => {
     });
 });
 
- 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`App running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Running on ${PORT}`));

@@ -50,6 +50,44 @@ button:hover { background: #45a049; }
     text-align: right;
 }
 
+.chat-container-wide {
+    max-width: 600px !important;
+    width: 95% !important;
+    height: 85vh; /* أخذ مساحة أكبر من طول الشاشة */
+    display: flex;
+    flex-direction: column;
+}
+
+#chat-view #chat-messages {
+    flex: 1;
+    height: auto;
+    max-height: none;
+}
+
+
+#attach-btn {
+    background: #444;
+    padding: 10px 15px;
+    font-size: 1.2rem;
+    color: white;
+}
+#attach-btn:hover {
+    background: #555;
+}
+
+
+.media-content {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 5px;
+    display: block;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+
+.message p {
+    margin: 0 0 5px 0;
+}
 .notice-icon {
     font-size: 1.5rem;
 }

@@ -11,6 +11,15 @@
     <div id="notification-banner" class="hidden"></div>
 
     <div id="todo-view" class="container">
+        <div class="app-notice">
+            <span class="notice-icon">🚀</span>
+            <p>
+                تم إطلاق النسخة السحابية الجديدة والمطورة!
+                <br>
+                <a href="https://unique-to-do-website.onrender.com" target="_blank" class="ad-link">جرب الموقع الجديد من هنا</a>
+            </p>
+        </div>
+
         <h2>مهامي</h2>
         <ul id="task-list"></ul>
         <div class="input-group">
@@ -19,13 +28,17 @@
         </div>
     </div>
 
-    <div id="chat-view" class="container hidden">
+    <!-- تمت إضافة كلاس chat-container-wide لتوسيع الشاشة -->
+    <div id="chat-view" class="container hidden chat-container-wide">
         <div id="chat-header">
             <h2>لا تنسى ان تبتسم ايه الجميل</h2>
             <span id="typing-indicator" class="hidden">شخص ما يكتب...</span>
         </div>
         <div id="chat-messages"></div>
         <div class="input-group">
+            <!-- حقل إرفاق الملفات -->
+            <input type="file" id="file-input" accept="image/*,video/*" class="hidden">
+            <button id="attach-btn" title="إرفاق صورة أو فيديو">📎</button>
             <input type="text" id="chat-input" placeholder="اكتب رسالة..." autocomplete="off">
             <button id="send-btn">إرسال</button>
         </div>

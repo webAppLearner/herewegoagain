@@ -25,11 +25,46 @@ mongoose.connect(MONGO_URI).then(() => {
     console.log("DB Connected");
 }).catch(err => console.log("Connection Error:", err.message));
 
+
 const messageSchema = new mongoose.Schema({
     token: String,
     msg: String,
+    fileData: String,  // لحفظ الصورة أو الفيديو
+    fileType: String,  // لمعرفة هل هو image أو video
     createdAt: { type: Date, default: Date.now, expires: 172800 }
 });
+const Message = mongoose.model('Message', messageSchema);
+
+
+    try {
+        const rows = await Message.find().sort({ createdAt: -1 }).limit(15);
+        const sortedRows = rows.reverse();
+        
+        if (sortedRows.length > 0) {
+            const history = sortedRows.map(r => ({
+                msg: r.msg,
+                fileData: r.fileData,
+                fileType: r.fileType,
+                type: r.token === socket.userToken ? 'sent' : 'received'
+            }));
+            socket.emit('chatHistory', history);
+        }
+    } catch (error) { ... }
+
+// 3. تحديث قسم إرسال الرسالة
+    socket.on('sendMessage', async (data) => {
+        socket.broadcast.emit('receiveMessage', data);
+        try {
+            await Message.create({ 
+                token: socket.userToken, 
+                msg: data.msg, 
+                fileData: data.fileData, 
+                fileType: data.fileType 
+            });
+        } catch (error) {
+            console.log("DB Error:", error.message);
+        }
+    });
 const Message = mongoose.model('Message', messageSchema);
 
 let tasks = [];

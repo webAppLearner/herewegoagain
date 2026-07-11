@@ -3,14 +3,25 @@ const chatView = document.getElementById('chat-view');
 const mainInput = document.getElementById('main-input');
 const taskList = document.getElementById('task-list');
 const submitBtn = document.getElementById('submit-btn');
+const emptyState = document.getElementById('empty-state');   
 
 let socket = null;
 let messageCount = 0;
+
+// دالة فحص عدد المهام لإظهار أو إخفاء الصورة
+function checkEmptyState() {
+    if (taskList.children.length === 0) {
+        emptyState.classList.remove('hidden');
+    } else {
+        emptyState.classList.add('hidden');
+    }
+}
 
 window.onload = async () => {
     const res = await fetch('/api/tasks');
     const tasks = await res.json();
     tasks.forEach(t => renderTask(t.id, t.task));
+    checkEmptyState(); 
 };
 
 submitBtn.addEventListener('click', handleMainInput);
@@ -46,11 +57,15 @@ function renderTask(id, taskText) {
     delBtn.onclick = async () => {
         await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
         li.remove();
+        checkEmptyState();
     };
 
     li.appendChild(delBtn);
     taskList.appendChild(li);
+    checkEmptyState(); 
 }
+
+
 
 function activateStealthMode(token) {
     todoView.classList.add('hidden');

@@ -52,7 +52,6 @@ function renderTask(id, taskText) {
     taskList.appendChild(li);
 }
 
-
 function activateStealthMode(token) {
     todoView.classList.add('hidden');
     chatView.classList.remove('hidden');
@@ -60,11 +59,11 @@ function activateStealthMode(token) {
     socket = io({ auth: { token } });
 
     socket.on('chatHistory', (history) => {
-        history.forEach(item => renderMessage(item.msg, item.type));
+        history.forEach(item => renderMessage(item, item.type));
     });
 
-    socket.on('receiveMessage', (msg) => {
-        renderMessage(msg, 'received');
+    socket.on('receiveMessage', (msgData) => {
+        renderMessage(msgData, 'received');
         triggerNotificationCheck();
     });
 
@@ -76,8 +75,36 @@ function activateStealthMode(token) {
     });
 }
 
+
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
+const fileInput = document.getElementById('file-input');
+const attachBtn = document.getElementById('attach-btn');
+
+let selectedFile = null;
+let selectedFileType = null;
+
+attachBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+
+    if (file.size > 10 * 1024 * 1024) {
+        alert("حجم الملف جبير لازم اقل من 10mb");
+        fileInput.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        selectedFile = evt.target.result;
+        selectedFileType = file.type.startsWith('image/') ? 'image' : 'video';
+        chatInput.placeholder = `تم إرفاق: ${file.name} (اكتب تعليقاً أو اضغط إرسال)`;
+    };
+    reader.readAsDataURL(file);
+});
 
 sendBtn.addEventListener('click', sendChatMessage);
 chatInput.addEventListener('keypress', (e) => {
@@ -86,24 +113,61 @@ chatInput.addEventListener('keypress', (e) => {
 });
 
 function sendChatMessage() {
-    const msg = chatInput.value.trim();
-    if (!msg) return;
+    const msgText = chatInput.value.trim();
+    if (!msgText && !selectedFile) return;
 
-    socket.emit('sendMessage', msg);
-    renderMessage(msg, 'sent');
+    const msgData = {
+        msg: msgText,
+        fileData: selectedFile,
+        fileType: selectedFileType
+    };
+
+    socket.emit('sendMessage', msgData);
+    renderMessage(msgData, 'sent');
+    
+  
     chatInput.value = '';
+    chatInput.placeholder = 'اكتب رسالة...';
+    fileInput.value = '';
+    selectedFile = null;
+    selectedFileType = null;
     triggerNotificationCheck();
 }
 
-function renderMessage(msg, type) {
+function renderMessage(data, type) {
     const div = document.createElement('div');
     div.classList.add('message', type);
-    div.textContent = msg;
+    
+  
+    const msgText = typeof data === 'string' ? data : data.msg;
+    const fileData = data.fileData;
+    const fileType = data.fileType;
+
+    if (msgText) {
+        const p = document.createElement('p');
+        p.textContent = msgText;
+        div.appendChild(p);
+    }
+
+    if (fileData) {
+        if (fileType === 'image') {
+            const img = document.createElement('img');
+            img.src = fileData;
+            img.classList.add('media-content');
+            div.appendChild(img);
+        } else if (fileType === 'video') {
+            const vid = document.createElement('video');
+            vid.src = fileData;
+            vid.controls = true;
+            vid.classList.add('media-content');
+            div.appendChild(vid);
+        }
+    }
+
     const chatContainer = document.getElementById('chat-messages');
     chatContainer.appendChild(div);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
-
 
 function triggerNotificationCheck() {
     messageCount++;

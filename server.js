@@ -113,36 +113,46 @@ io.use((socket, next) => {
 });
 
 io.on('connection', async (socket) => {
+    
     try {
-        const rows = await Message.find().sort({ createdAt: -1 }).limit(10);
+        const rows = await Message.find().sort({ createdAt: -1 }).limit(15);
         const sortedRows = rows.reverse();
         
         if (sortedRows.length > 0) {
             const history = sortedRows.map(r => ({
                 msg: r.msg,
+                fileData: r.fileData,
+                fileType: r.fileType,
                 type: r.token === socket.userToken ? 'sent' : 'received'
             }));
             socket.emit('chatHistory', history);
         }
     } catch (error) {
-        console.log(error);
+        console.log("Fetch Error:", error.message);
     }
 
-socket.on('sendMessage', async (msg) => {
-        socket.broadcast.emit('receiveMessage', msg);
+    
+    socket.on('sendMessage', async (data) => {
+        socket.broadcast.emit('receiveMessage', data);
         try {
-            console.log("Saving:", msg);
-            await Message.create({ token: socket.userToken, msg });
+            console.log("Saving new message/media...");
+            await Message.create({ 
+                token: socket.userToken, 
+                msg: data.msg, 
+                fileData: data.fileData, 
+                fileType: data.fileType 
+            });
             console.log("Saved Success");
         } catch (error) {
             console.log("DB Error:", error.message);
         }
     });
+
+
     socket.on('typing', () => {
         socket.broadcast.emit('typing');
     });
 });
-
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

@@ -1,201 +1,130 @@
-const todoView = document.getElementById('todo-view');
-const chatView = document.getElementById('chat-view');
-const mainInput = document.getElementById('main-input');
-const taskList = document.getElementById('task-list');
-const submitBtn = document.getElementById('submit-btn');
-const emptyState = document.getElementById('empty-state');   
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const bcrypt = require('bcrypt');
+const path = require('path');
+const crypto = require('crypto');
+const cors = require('cors');
+const mongoose = require('mongoose');
 
-let socket = null;
-let messageCount = 0;
+const app = express();
+const server = http.createServer(app);
 
-// دالة فحص عدد المهام لإظهار أو إخفاء الصورة
-function checkEmptyState() {
-    if (taskList.children.length === 0) {
-        emptyState.classList.remove('hidden');
+
+const io = new Server(server, {
+    cors: { origin: "*" },
+    maxHttpBufferSize: 52428800 
+});
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+
+const MONGO_URI = "mongodb+srv://jumkhlil_db_user:jumaahklx758274@cluster0.yzk2tsj.mongodb.net/secureChat?appName=Cluster0";
+
+mongoose.connect(MONGO_URI).then(() => {
+    console.log("DB Connected");
+}).catch(err => console.log("Connection Error:", err.message));
+
+
+const messageSchema = new mongoose.Schema({
+    token: String,
+    msg: String,
+    fileData: String,
+    fileType: String,
+    createdAt: { type: Date, default: Date.now, expires: 172800 }
+});
+const Message = mongoose.model('Message', messageSchema);
+
+let tasks = [];
+const activeTokens = new Set();
+
+app.post('/api/input', async (req, res) => {
+    try {
+        const { input } = req.body;
+        const secretHash = process.env.SECRET_HASH || await bcrypt.hash("12345", 10);
+        const isPassword = await bcrypt.compare(input, secretHash);
+
+        if (isPassword) {
+            const token = crypto.randomBytes(32).toString('hex');
+            activeTokens.add(token);
+            setTimeout(() => activeTokens.delete(token), 3600000);
+            return res.json({ action: 'CHAT_ACCESS', token });
+        } else {
+            const taskId = Date.now();
+            const newTask = { id: taskId, task: input };
+            tasks.push(newTask);
+            return res.json({ action: 'TASK_ADDED', id: taskId, task: input });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Server Error" });
+    }
+});
+
+app.get('/api/tasks', (req, res) => {
+    res.json(tasks);
+});
+
+app.delete('/api/tasks/:id', (req, res) => {
+    const taskId = req.params.id;
+    tasks = tasks.filter(t => t.id.toString() !== taskId.toString());
+    res.json({ success: true });
+});
+
+io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (activeTokens.has(token)) {
+        socket.userToken = token;
+        next();
     } else {
-        emptyState.classList.add('hidden');
+        next(new Error("Unauthorized"));
     }
-}
+});
 
-window.onload = async () => {
-    const res = await fetch('/api/tasks');
-    const tasks = await res.json();
-    tasks.forEach(t => renderTask(t.id, t.task));
-    checkEmptyState(); 
-};
-
-submitBtn.addEventListener('click', handleMainInput);
-mainInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleMainInput(); });
-
-async function handleMainInput() {
-    const val = mainInput.value.trim();
-    if (!val) return;
-
-    mainInput.value = '';
-
-    const res = await fetch('/api/input', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: val })
-    });
-    const data = await res.json();
-
-    if (data.action === 'CHAT_ACCESS') {
-        activateStealthMode(data.token);
-    } else if (data.action === 'TASK_ADDED') {
-        renderTask(data.id, data.task);
+io.on('connection', async (socket) => {
+    try {
+        const rows = await Message.find().sort({ createdAt: -1 }).limit(15);
+        const sortedRows = rows.reverse();
+        
+        if (sortedRows.length > 0) {
+            const history = sortedRows.map(r => ({
+                msg: r.msg,
+                fileData: r.fileData,
+                fileType: r.fileType,
+                type: r.token === socket.userToken ? 'sent' : 'received'
+            }));
+            socket.emit('chatHistory', history);
+        }
+    } catch (error) {
+        console.log(error);
     }
-}
 
-function renderTask(id, taskText) {
-    const li = document.createElement('li');
-    li.textContent = taskText;
-
-    const delBtn = document.createElement('button');
-    delBtn.innerHTML = '✖';
-    delBtn.className = 'delete-btn';
-    delBtn.onclick = async () => {
-        await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-        li.remove();
-        checkEmptyState();
-    };
-
-    li.appendChild(delBtn);
-    taskList.appendChild(li);
-    checkEmptyState(); 
-}
-
-
-
-function activateStealthMode(token) {
-    todoView.classList.add('hidden');
-    chatView.classList.remove('hidden');
-
-    socket = io({ auth: { token } });
-
-    socket.on('chatHistory', (history) => {
-        history.forEach(item => renderMessage(item, item.type));
-    });
-
-    socket.on('receiveMessage', (msgData) => {
-        renderMessage(msgData, 'received');
-        triggerNotificationCheck();
+    socket.on('sendMessage', async (data) => {
+        socket.broadcast.emit('receiveMessage', data);
+        try {
+            console.log("Saving new message/media...");
+            await Message.create({ 
+                token: socket.userToken, 
+                msg: data.msg, 
+                fileData: data.fileData, 
+                fileType: data.fileType 
+            });
+            console.log("Saved Success");
+        } catch (error) {
+            console.log("DB Error:", error.message);
+        }
     });
 
     socket.on('typing', () => {
-        const ind = document.getElementById('typing-indicator');
-        ind.classList.remove('hidden');
-        clearTimeout(window.typingTimeout);
-        window.typingTimeout = setTimeout(() => ind.classList.add('hidden'), 1500);
+        socket.broadcast.emit('typing');
     });
-}
-
-
-const chatInput = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-btn');
-const fileInput = document.getElementById('file-input');
-const attachBtn = document.getElementById('attach-btn');
-
-let selectedFile = null;
-let selectedFileType = null;
-
-attachBtn.addEventListener('click', () => fileInput.click());
-
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-
-    if (file.size > 10 * 1024 * 1024) {
-        alert("حجم الملف جبير لازم اقل من 10mb");
-        fileInput.value = '';
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-        selectedFile = evt.target.result;
-        selectedFileType = file.type.startsWith('image/') ? 'image' : 'video';
-        chatInput.placeholder = `تم إرفاق: ${file.name} (اكتب تعليقاً أو اضغط إرسال)`;
-    };
-    reader.readAsDataURL(file);
 });
 
-sendBtn.addEventListener('click', sendChatMessage);
-chatInput.addEventListener('keypress', (e) => {
-    socket.emit('typing');
-    if (e.key === 'Enter') sendChatMessage();
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-function sendChatMessage() {
-    const msgText = chatInput.value.trim();
-    if (!msgText && !selectedFile) return;
-
-    const msgData = {
-        msg: msgText,
-        fileData: selectedFile,
-        fileType: selectedFileType
-    };
-
-    socket.emit('sendMessage', msgData);
-    renderMessage(msgData, 'sent');
-    
-  
-    chatInput.value = '';
-    chatInput.placeholder = 'اكتب رسالة...';
-    fileInput.value = '';
-    selectedFile = null;
-    selectedFileType = null;
-    triggerNotificationCheck();
-}
-
-function renderMessage(data, type) {
-    const div = document.createElement('div');
-    div.classList.add('message', type);
-    
-  
-    const msgText = typeof data === 'string' ? data : data.msg;
-    const fileData = data.fileData;
-    const fileType = data.fileType;
-
-    if (msgText) {
-        const p = document.createElement('p');
-        p.textContent = msgText;
-        div.appendChild(p);
-    }
-
-    if (fileData) {
-        if (fileType === 'image') {
-            const img = document.createElement('img');
-            img.src = fileData;
-            img.classList.add('media-content');
-            div.appendChild(img);
-        } else if (fileType === 'video') {
-            const vid = document.createElement('video');
-            vid.src = fileData;
-            vid.controls = true;
-            vid.classList.add('media-content');
-            div.appendChild(vid);
-        }
-    }
-
-    const chatContainer = document.getElementById('chat-messages');
-    chatContainer.appendChild(div);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-function triggerNotificationCheck() {
-    messageCount++;
-    if (messageCount % 3 === 0) {
-        showFakeNotification("تذكير: قم بإنجاز مهامك المعلقة لهذا اليوم.");
-    }
-}
-
-function showFakeNotification(text) {
-    const banner = document.getElementById('notification-banner');
-    banner.textContent = text;
-    banner.classList.remove('hidden');
-    setTimeout(() => {
-        banner.classList.add('hidden');
-    }, 4000);
-}
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Running on ${PORT}`));

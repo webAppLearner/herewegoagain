@@ -11,65 +11,37 @@ const mongoose = require('mongoose');
 const app = express();
 const server = http.createServer(app);
 
+// رفع سعة استلام البيانات لدعم الصور والفيديوهات (50 ميجابايت)
 const io = new Server(server, {
     cors: { origin: "*" },
-    maxHttpBufferSize: 52428800
+    maxHttpBufferSize: 52428800 
 });
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// رابط الاتصال المباشر بقاعدة البيانات لتجنب أخطاء Render
 const MONGO_URI = "mongodb+srv://jumkhlil_db_user:jumaahklx758274@cluster0.yzk2tsj.mongodb.net/secureChat?appName=Cluster0";
+
 mongoose.connect(MONGO_URI).then(() => {
     console.log("DB Connected");
 }).catch(err => console.log("Connection Error:", err.message));
 
-
+// هيكل قاعدة البيانات الذي يقبل النصوص والوسائط
 const messageSchema = new mongoose.Schema({
     token: String,
     msg: String,
-    fileData: String,  // لحفظ الصورة أو الفيديو
-    fileType: String,  // لمعرفة هل هو image أو video
+    fileData: String,
+    fileType: String,
     createdAt: { type: Date, default: Date.now, expires: 172800 }
 });
-const Message = mongoose.model('Message', messageSchema);
-
-
-    try {
-        const rows = await Message.find().sort({ createdAt: -1 }).limit(15);
-        const sortedRows = rows.reverse();
-        
-        if (sortedRows.length > 0) {
-            const history = sortedRows.map(r => ({
-                msg: r.msg,
-                fileData: r.fileData,
-                fileType: r.fileType,
-                type: r.token === socket.userToken ? 'sent' : 'received'
-            }));
-            socket.emit('chatHistory', history);
-        }
-    } catch (error) { ... }
-
-// 3. تحديث قسم إرسال الرسالة
-    socket.on('sendMessage', async (data) => {
-        socket.broadcast.emit('receiveMessage', data);
-        try {
-            await Message.create({ 
-                token: socket.userToken, 
-                msg: data.msg, 
-                fileData: data.fileData, 
-                fileType: data.fileType 
-            });
-        } catch (error) {
-            console.log("DB Error:", error.message);
-        }
-    });
 const Message = mongoose.model('Message', messageSchema);
 
 let tasks = [];
 const activeTokens = new Set();
 
+ 
 app.post('/api/input', async (req, res) => {
     try {
         const { input } = req.body;
@@ -79,7 +51,7 @@ app.post('/api/input', async (req, res) => {
         if (isPassword) {
             const token = crypto.randomBytes(32).toString('hex');
             activeTokens.add(token);
-            setTimeout(() => activeTokens.delete(token), 3600000);
+            setTimeout(() => activeTokens.delete(token), 3600000); // Token صالح لساعة واحدة
             return res.json({ action: 'CHAT_ACCESS', token });
         } else {
             const taskId = Date.now();
@@ -102,6 +74,7 @@ app.delete('/api/tasks/:id', (req, res) => {
     res.json({ success: true });
 });
 
+
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (activeTokens.has(token)) {
@@ -114,6 +87,7 @@ io.use((socket, next) => {
 
 io.on('connection', async (socket) => {
     
+   
     try {
         const rows = await Message.find().sort({ createdAt: -1 }).limit(15);
         const sortedRows = rows.reverse();
@@ -131,7 +105,7 @@ io.on('connection', async (socket) => {
         console.log("Fetch Error:", error.message);
     }
 
-    
+
     socket.on('sendMessage', async (data) => {
         socket.broadcast.emit('receiveMessage', data);
         try {
@@ -148,11 +122,11 @@ io.on('connection', async (socket) => {
         }
     });
 
-
     socket.on('typing', () => {
         socket.broadcast.emit('typing');
     });
 });
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

@@ -92,3 +92,32 @@ button:hover { background: #45a049; }
     font-size: 0.9rem;
     margin: 0;
 }
+.input-group {
+    display: flex;
+    gap: 8px;  
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.input-group input[type="text"] {
+    flex: 1; 
+    min-width: 0; /* مهم جداً لمنع الحقل من التمدد خارج الشاشة */
+    padding: 12px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 1px solid #444;
+}
+
+
+.input-group button {
+    flex-shrink: 0; 
+    padding: 10px 15px;
+    white-space: nowrap;  
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+#attach-btn {
+    padding: 10px 12px;
+    font-size: 1.1rem;
+}

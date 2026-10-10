@@ -12,8 +12,7 @@
 
     <div id="todo-view" class="container">
         <h2>مهامي</h2>
-        
-        <!-- صورة العادات (تظهر فقط عندما لا توجد مهام) -->
+
         <div id="empty-state" class="hidden">
             <img src="https://cdn-icons-png.flaticon.com/512/10433/10433048.png" alt="بناء العادات" class="empty-image">
             <p class="empty-text">لا توجد مهام حالياً. ركز على بناء عاداتك الإيجابية!</p>
@@ -26,13 +25,19 @@
         </div>
     </div>
 
-    <!-- نافذة الدردشة المخفية -->
     <div id="chat-view" class="container hidden chat-container-wide">
         <div id="chat-header">
             <h2>لا تنسى ان تبتسم ايه الجميل</h2>
             <span id="typing-indicator" class="hidden">شخص ما يكتب...</span>
         </div>
-        <div id="chat-messages"></div>
+        <div id="chat-messages">
+           
+            <div class="pinned-message">
+                <p>📌 حاذف التيكتوك وفريفاير : متواجد هنا بلموقع كل اربعاء ساعة 10 (اذا جنتي موجودة اصلا)</p>
+                <span class="pinned-date">أُرسلت في: 10 أكتوبر 2026</span>
+            </div>
+            
+        </div>
         <div class="input-group">
             <!-- حقل إرفاق الملفات -->
             <input type="file" id="file-input" accept="image/*,video/*" class="hidden">

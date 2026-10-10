@@ -121,3 +121,34 @@ button:hover { background: #45a049; }
     padding: 10px 12px;
     font-size: 1.1rem;
 }
+/* === تنسيق الرسالة المثبتة === */
+.pinned-message {
+    background-color: rgba(211, 47, 47, 0.15); /* خلفية حمراء شفافة تناسب الوضع الداكن */
+    color: #ff5252; /* نص أحمر واضح */
+    border: 1px solid rgba(255, 82, 82, 0.3);
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin: 10px auto 15px auto;
+    text-align: center;
+    width: 90%;
+    
+    /* جعل الرسالة ملتصقة في الأعلى دائماً */
+    position: sticky;
+    top: 5px;
+    z-index: 10;
+    backdrop-filter: blur(5px); /* تأثير ضبابي جميل للخلفية */
+}
+
+.pinned-message p {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: bold;
+}
+
+.pinned-date {
+    display: block;
+    font-size: 0.75rem;
+    color: #ff8a80; /* لون أفتح للتاريخ */
+    margin-top: 6px;
+    opacity: 0.9;
+}
